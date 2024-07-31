@@ -43,7 +43,7 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
    */
   @Override
   public void robotInit() {
-    
+
     robotDrive.setDeadband(0.05);//Evita que se mueva el robot con movimientos muy minimos del joystick
 
     rightMotors.setInverted(true);//invierte el giro del  motor derecho segun la posicion en el chasis
@@ -62,8 +62,9 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
     //Inicializar datos en Dashboard
     SmartDashboard.putNumber("Chasis Speed", 0.5);
     SmartDashboard.putNumber("AutoCM", 0);
+    SmartDashboard.putNumber("Set Point test", 100);
 
-    /*  Inicia la captura automática de la cámara USB
+      //Inicia la captura automática de la cámara USB
         UsbCamera camera = CameraServer.startAutomaticCapture("USB Camera 0", 0);
         // Establece la resolución y la velocidad de cuadros
         camera.setResolution(320, 240);
@@ -71,10 +72,13 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
         // Configuración adicional si es necesaria
         camera.setBrightness(50); // Ajustar el brillo
         camera.setExposureManual(50); // Ajustar la exposición
+    
+    
 
-*/
-         
-
+  }
+  
+  @Override
+  public void robotPeriodic() {
   }
 
   /** This function is run once each time the robot enters autonomous mode. */
@@ -91,10 +95,15 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
   @Override
   public void autonomousPeriodic() {
 
+    double leftDistance = Math.round(2.54 * leftEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder en CM
+    double rightDistance = Math.round(2.54 * rightEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder en CM
+    double chasisDistance = ((leftDistance + rightDistance) / 2); // obtiene un promedio de las 2 distancias.
    
     //Control de avance en autonomo con encoders.
 
-    /*if (chasisDistance < autoSPcm) {
+    
+    int autoSPcm = 100;
+    if (chasisDistance < autoSPcm) {
       robotDrive.arcadeDrive(0.5, 0);
       
     } else {
@@ -102,7 +111,7 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
       robotDrive.arcadeDrive(0,0);
     
     }
-    */
+    
     
     // Control de autonomo por tiempo de  2 seconds
     /*if (timer.get() < 2.0) {
@@ -161,9 +170,12 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
   /** This function is called periodically during test mode. */
   @Override
   public void testPeriodic() {
+
+    double testSP = SmartDashboard.getNumber("Set Point test", 100);
+
     if (driverJoystick.getCrossButton()) {
 
-      setpoint = 100;
+      setpoint = testSP;
     } else if (driverJoystick.getCircleButton()) {
 
       setpoint = 0;
