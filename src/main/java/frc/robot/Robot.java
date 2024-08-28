@@ -7,11 +7,22 @@ import edu.wpi.first.wpilibj.Timer;       //Clase de un temporizador para calcul
 import edu.wpi.first.wpilibj.PS4Controller;//Clase para interface de un control PS4
 import edu.wpi.first.wpilibj.drive.DifferentialDrive; //Clase para manejo de un robot con drive diferencial 
 import edu.wpi.first.wpilibj.motorcontrol.VictorSP; //Clase para controladores de velocidad VictorSP
+import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
+import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard; //Clase para lectura/escritura en Shuffleboard.
+
+import java.util.Map;
+
 import edu.wpi.first.cameraserver.CameraServer; //Clase para iniciar la transmision USB de webcam
 import edu.wpi.first.cscore.UsbCamera; //Clase para crear objeto de camara USB y configurar sus parametros de video.
+import edu.wpi.first.networktables.GenericEntry;
 import edu.wpi.first.wpilibj.CounterBase; //Clase para conteo de ticks de encoders.
+import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.Encoder; //Clase para interface con sensores encoders.
+import edu.wpi.first.wpilibj.AnalogInput;
+
+
 
 
 public class Robot extends TimedRobot {  //Clase principal del  principal del robot aqui se ponen variables globales.
@@ -29,6 +40,15 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
   //Se crean los encoders izquierdo y derecho y su mapeo de conexion.
   private final Encoder leftEncoder = new Encoder(0, 1, true, CounterBase.EncodingType.k4X);
   private final Encoder rightEncoder = new Encoder(2, 3, false, CounterBase.EncodingType.k4X);
+  DigitalInput LimitSwitch = new DigitalInput(4);
+  DigitalInput HallSwitch = new DigitalInput(5);
+  DigitalInput ProxSwitch = new DigitalInput(6);
+
+  AnalogInput distancia = new AnalogInput(0);
+
+  ShuffleboardTab tab = Shuffleboard.getTab("ShuffleBoard");
+  GenericEntry ShuffleBoard = tab.add("Distancia", 0).getEntry();
+  GenericEntry motores = tab.addPersistent("Max Speed", 1).withWidget(BuiltInWidgets.kNumberSlider).withProperties(Map.of("min",0,"max",1)).withSize(4, 2).withPosition(0, 5).getEntry();
 
   double setpoint;
 
@@ -64,21 +84,51 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
     SmartDashboard.putNumber("AutoCM", 0);
     SmartDashboard.putNumber("Set Point test", 100);
 
+   
+
       //Inicia la captura automática de la cámara USB
-        UsbCamera camera = CameraServer.startAutomaticCapture("USB Camera 0", 0);
+        UsbCamera camera = CameraServer.startAutomaticCapture("Camara Frontal", 0);
         // Establece la resolución y la velocidad de cuadros
         camera.setResolution(320, 240);
         camera.setFPS(15);
         // Configuración adicional si es necesaria
         camera.setBrightness(50); // Ajustar el brillo
         camera.setExposureManual(50); // Ajustar la exposición
-    
-    
+
+        
+        
 
   }
   
   @Override
   public void robotPeriodic() {
+
+
+   
+    SmartDashboard.putBoolean("Sensores/Limit Switch", !LimitSwitch.get());
+    SmartDashboard.putBoolean("Sensores/Hall Switch", !HallSwitch.get());
+    SmartDashboard.putBoolean("Sensores/Prox Switch", ProxSwitch.get());
+
+    SmartDashboard.putNumber("Sensores/LeftEncoder Distance inches", Math.round(leftEncoder.getDistance() * 100) / 100d);
+    SmartDashboard.putNumber("Sensores/LeftEncoder Distance CM", Math.round(2.54 * leftEncoder.getDistance() * 100) / 100d);
+    SmartDashboard.putNumber("Sensores/LeftEncoder Rate", leftEncoder.getRate());
+    SmartDashboard.putNumber("Sensores/LeftEncoder raw", leftEncoder.getRaw());
+    SmartDashboard.putNumber("Sensores/RightEncoder Distance inches", Math.round(rightEncoder.getDistance() * 100) / 100d);
+    SmartDashboard.putNumber("Sensores/RightEncoder Distance CM", Math.round(2.54 * rightEncoder.getDistance() * 100) / 100d);
+    SmartDashboard.putNumber("Sensores/RightEncoder Rate", rightEncoder.getRate());
+    SmartDashboard.putNumber("Sensores/RightEncoder raw", rightEncoder.getRaw());
+
+
+    double sensorValue = distancia.getVoltage();
+    final double scaleFactor = 1 / (5. / 1024.); // scale converting voltage to distance
+    double distance = 5 * sensorValue * scaleFactor; // convert the voltage to distance
+    SmartDashboard.putNumber("Sensores/Ultrasonic MB1200", distance); // write the value to the LabVIEW DriverStation
+
+    ShuffleBoard.setDouble(distance);
+    motores.getDouble(1);
+
+
+
   }
 
   /** This function is run once each time the robot enters autonomous mode. */
@@ -138,18 +188,8 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
 
     robotDrive.arcadeDrive( power * chasisSpeed, turn * chasisSpeed);
 
+    
 
-
-   
-   SmartDashboard.putNumber("LeftEncoder Distance inches", Math.round(leftEncoder.getDistance() * 100) / 100d);
-   SmartDashboard.putNumber("LeftEncoder Distance CM", Math.round(2.54 * leftEncoder.getDistance() * 100) / 100d);
-   SmartDashboard.putNumber("LeftEncoder Rate", leftEncoder.getRate());
-   SmartDashboard.putNumber("LeftEncoder raw", leftEncoder.getRaw());
-
-   SmartDashboard.putNumber("RightEncoder Distance inches", Math.round(rightEncoder.getDistance() * 100) / 100d);
-   SmartDashboard.putNumber("RightEncoder Distance CM", Math.round(2.54 * rightEncoder.getDistance() * 100) / 100d);
-   SmartDashboard.putNumber("RightEncoder Rate", rightEncoder.getRate());
-   SmartDashboard.putNumber("RightEncoder raw", rightEncoder.getRaw());
     
 
     
@@ -200,10 +240,10 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
 
     // Muestra los valores en autonomo.
 
-    SmartDashboard.putNumber("Set Point", setpoint);
-    SmartDashboard.putNumber("Right Position", rightDistance);
-    SmartDashboard.putNumber("Left Position", leftDistance);
-    SmartDashboard.putNumber("outputSpeed %", ScaledOutputSpeed*100);
+    SmartDashboard.putNumber("PIDChasis/Set Point", setpoint);
+    SmartDashboard.putNumber("PIDChasis/Right Position", rightDistance);
+    SmartDashboard.putNumber("PIDChasis/Left Position", leftDistance);
+    SmartDashboard.putNumber("PIDChasis/outputSpeed %", ScaledOutputSpeed*100);
 
 
 
