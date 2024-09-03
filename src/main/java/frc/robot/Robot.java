@@ -5,12 +5,15 @@ package frc.robot;
 import edu.wpi.first.wpilibj.TimedRobot;  //Clase de framework de un robot timed, las funciones periodicas se ejecutan cada 20ms.
 import edu.wpi.first.wpilibj.Timer;       //Clase de un temporizador para calcular tiempo.
 import edu.wpi.first.wpilibj.PS4Controller;//Clase para interface de un control PS4
+import edu.wpi.first.wpilibj.PneumaticsModuleType;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive; //Clase para manejo de un robot con drive diferencial 
 import edu.wpi.first.wpilibj.motorcontrol.VictorSP; //Clase para controladores de velocidad VictorSP
 import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
 import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard; //Clase para lectura/escritura en Shuffleboard.
+import frc.robot.LimelightHelpers;
 
 import java.util.Map;
 
@@ -21,12 +24,33 @@ import edu.wpi.first.wpilibj.CounterBase; //Clase para conteo de ticks de encode
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.Encoder; //Clase para interface con sensores encoders.
 import edu.wpi.first.wpilibj.AnalogInput;
+import edu.wpi.first.wpilibj.Compressor;
+
+import com.kauailabs.navx.frc.AHRS;
+import edu.wpi.first.wpilibj.SPI;
+import edu.wpi.first.wpilibj.Servo;
+import edu.wpi.first.wpilibj.Solenoid;
+import edu.wpi.first.networktables.NetworkTable;
+import edu.wpi.first.networktables.NetworkTableEntry;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.wpilibj.PneumaticHub;
 
 
 
+public class Robot extends TimedRobot {
 
-public class Robot extends TimedRobot {  //Clase principal del  principal del robot aqui se ponen variables globales.
+  Servo servo = new Servo(9);
+  
+   private static final String kDefaultAuto = "Default";
+  private static final String kCustomAuto = "My Auto";
+  private String m_autoSelected;
+  private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
+  //Clase principal del  principal del robot aqui se ponen variables globales.
+
+
+
+  private final AHRS navx = new AHRS(SPI.Port.kMXP);
   //Se crean los objetos de motores iquierdos y derechos.
   private final VictorSP leftMotors = new VictorSP(0);
   private final VictorSP rightMotors = new VictorSP(1);
@@ -44,16 +68,32 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
   DigitalInput HallSwitch = new DigitalInput(5);
   DigitalInput ProxSwitch = new DigitalInput(6);
 
-  AnalogInput distancia = new AnalogInput(0);
+  AnalogInput distancia = new AnalogInput(1);
+  
 
   ShuffleboardTab tab = Shuffleboard.getTab("ShuffleBoard");
-  GenericEntry ShuffleBoard = tab.add("Distancia", 0).getEntry();
-  GenericEntry motores = tab.addPersistent("Max Speed", 1).withWidget(BuiltInWidgets.kNumberSlider).withProperties(Map.of("min",0,"max",1)).withSize(4, 2).withPosition(0, 5).getEntry();
+  //GenericEntry ShuffleBoard = tab.add("Distancia", 0).getEntry();
+  //GenericEntry motores = tab.addPersistent("Max Speed", 1).withWidget(BuiltInWidgets.kNumberSlider).withProperties(Map.of("min",0,"max",1)).withSize(4, 2).withPosition(0, 5).getEntry();
 
   double setpoint;
+  double anguloZ = 0;
+
+
+  NetworkTable table = NetworkTableInstance.getDefault().getTable("limelight");
+  NetworkTableEntry tx = table.getEntry("tx");
+  NetworkTableEntry ty = table.getEntry("ty");
+  NetworkTableEntry ta = table.getEntry("ta");
+
+  PneumaticHub m_pH = new PneumaticHub(1);
+  private final Solenoid m_solenoid = m_pH.makeSolenoid(0);
+  private final Compressor m_compressor = m_pH.makeCompressor();
 
   //Constructor de la clase robot.
   public Robot() {
+
+    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
+    m_chooser.addOption("My Auto", kCustomAuto);
+    SmartDashboard.putData("Auto choices", m_chooser);
     
   }
 
@@ -63,10 +103,13 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
    */
   @Override
   public void robotInit() {
+    distancia.setOversampleBits(4);
+    distancia.setAverageBits(4);
 
     robotDrive.setDeadband(0.05);//Evita que se mueva el robot con movimientos muy minimos del joystick
 
-    rightMotors.setInverted(true);//invierte el giro del  motor derecho segun la posicion en el chasis
+    rightMotors.setInverted(true);//invierte el giro del  motor derecho segun la posicion en el chasis.
+    robotDrive.setMaxOutput(0.8); //Limita la velocidad maxima del Drive Train a 0.8 para pruebas.
 
     //Inicializar encoders
     leftEncoder.setSamplesToAverage(5); //El numero promedio de muestras antes de hacer el calculo.
@@ -83,6 +126,7 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
     SmartDashboard.putNumber("Chasis Speed", 0.5);
     SmartDashboard.putNumber("AutoCM", 0);
     SmartDashboard.putNumber("Set Point test", 100);
+    SmartDashboard.putNumber("Motores/servo", 0.5);
 
    
 
@@ -94,15 +138,21 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
         // Configuración adicional si es necesaria
         camera.setBrightness(50); // Ajustar el brillo
         camera.setExposureManual(50); // Ajustar la exposición
-
         
+        anguloZ = 0;
         
-
+        navx.reset();
   }
   
   @Override
   public void robotPeriodic() {
 
+    if (driverJoystick.getOptionsButton()) {
+      
+      navx.reset();
+      navx.resetDisplacement();
+
+    }
 
    
     SmartDashboard.putBoolean("Sensores/Limit Switch", !LimitSwitch.get());
@@ -120,14 +170,71 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
 
 
     double sensorValue = distancia.getVoltage();
-    final double scaleFactor = 1 / (5. / 1024.); // scale converting voltage to distance
+    final double scaleFactor = 1; // scale converting voltage to distance CM
     double distance = 5 * sensorValue * scaleFactor; // convert the voltage to distance
     SmartDashboard.putNumber("Sensores/Ultrasonic MB1200", distance); // write the value to the LabVIEW DriverStation
 
-    ShuffleBoard.setDouble(distance);
-    motores.getDouble(1);
+    //ShuffleBoard.setDouble(distance);
+    //motores.getDouble(1);
 
 
+
+    // Leer los datos del NavX y mostrarlos en el SmartDashboard
+    double yaw = navx.getYaw(); // Ángulo de rotación alrededor del eje Z
+    double pitch = navx.getPitch(); // Ángulo de inclinación alrededor del eje Y
+    double roll = navx.getRoll(); // Ángulo de inclinación alrededor del eje X
+    double compassHeading = navx.getCompassHeading(); // Brújula: 0 a 360 grados
+    double fusedHeading = navx.getFusedHeading(); // Combinación de brújula y giroscopio
+    double altitude = navx.getAltitude(); // Altitud basada en presión barométrica
+    double linearAccelX = navx.getWorldLinearAccelX(); // Aceleración lineal en el eje X
+    double linearAccelY = navx.getWorldLinearAccelY(); // Aceleración lineal en el eje Y
+    double linearAccelZ = navx.getWorldLinearAccelZ(); // Aceleración lineal en el eje Z
+    double totalAccelX = navx.getRawAccelX(); // Aceleración total en el eje X
+    double totalAccelY = navx.getRawAccelY(); // Aceleración total en el eje Y
+    double totalAccelZ = navx.getRawAccelZ(); // Aceleración total en el eje Z
+    double velocityX = navx.getVelocityX(); // Velocidad en el eje X
+    double velocityY = navx.getVelocityY(); // Velocidad en el eje Y
+    double velocityZ = navx.getVelocityZ(); // Velocidad en el eje Z
+    double displacementX = navx.getDisplacementX(); // Desplazamiento en el eje X
+    double displacementY = navx.getDisplacementY(); // Desplazamiento en el eje Y
+    double displacementZ = navx.getDisplacementZ(); // Desplazamiento en el eje Z
+    double temperature = navx.getTempC(); // Temperatura del sensor en grados Celsius
+     anguloZ = (int)navx.getAngle();
+
+    // Mostrar los datos en el SmartDashboard
+    SmartDashboard.putNumber("Navx/Yaw", yaw);
+    SmartDashboard.putNumber("Navx/Pitch", pitch);
+    SmartDashboard.putNumber("Navx/Roll", roll);
+    SmartDashboard.putNumber("Navx/Compass Heading", compassHeading);
+    SmartDashboard.putNumber("Navx/Fused Heading", fusedHeading);
+    SmartDashboard.putNumber("Navx/Altitude", altitude);
+    SmartDashboard.putNumber("Navx/Linear Accel X", linearAccelX);
+    SmartDashboard.putNumber("Navx/Linear Accel Y", linearAccelY);
+    SmartDashboard.putNumber("Navx/Linear Accel Z", linearAccelZ);
+    SmartDashboard.putNumber("Navx/Total Accel X", totalAccelX);
+    SmartDashboard.putNumber("Navx/Total Accel Y", totalAccelY);
+    SmartDashboard.putNumber("Navx/Total Accel Z", totalAccelZ);
+    SmartDashboard.putNumber("Navx/Velocity X", velocityX);
+    SmartDashboard.putNumber("Navx/Velocity Y", velocityY);
+    SmartDashboard.putNumber("Navx/Velocity Z", velocityZ);
+    SmartDashboard.putNumber("Navx/Displacement X", displacementX);
+    SmartDashboard.putNumber("Navx/Displacement Y", displacementY);
+    SmartDashboard.putNumber("Navx/Displacement Z", displacementZ);
+    SmartDashboard.putNumber("Navx/Temperature", temperature);
+    SmartDashboard.putNumber("Navx/Angulo", anguloZ);
+
+
+    double x = tx.getDouble(0.0);
+    double y = ty.getDouble(0.0);
+    double area = ta.getDouble(0.0);
+
+    SmartDashboard.putNumber("Vision/LimelightX", x);
+    SmartDashboard.putNumber("Vision/LimelightY", y);
+    SmartDashboard.putNumber("Vision/LimelightArea", area);
+
+    
+
+    servo.set(SmartDashboard.getNumber("Motores/servo", 0.5));
 
   }
 
@@ -137,6 +244,10 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
     leftEncoder.reset();
     rightEncoder.reset();
     timer.restart();
+
+    m_autoSelected = m_chooser.getSelected();
+    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
+    System.out.println("Auto selected: " + m_autoSelected);
     
     
   }
@@ -144,6 +255,16 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
   /** This function is called periodically during autonomous. */
   @Override
   public void autonomousPeriodic() {
+
+    switch (m_autoSelected) {
+      case kCustomAuto:
+        // Put custom auto code here
+        break;
+      case kDefaultAuto:
+      default:
+        // Put default auto code here
+        break;
+    }
 
     double leftDistance = Math.round(2.54 * leftEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder en CM
     double rightDistance = Math.round(2.54 * rightEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder en CM
@@ -175,11 +296,18 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
 
   /** This function is called once each time the robot enters teleoperated mode. */
   @Override
-  public void teleopInit() {}
+  public void teleopInit() {
+
+    navx.reset();
+    navx.resetDisplacement();
+
+  }
 
   /** This function is called periodically during teleoperated mode. */
   @Override
   public void teleopPeriodic() {
+
+      
 
         double chasisSpeed = SmartDashboard.getNumber("Chasis Speed", 0.5);
 
@@ -211,6 +339,8 @@ public class Robot extends TimedRobot {  //Clase principal del  principal del ro
   @Override
   public void testPeriodic() {
 
+
+      m_solenoid.set(true);
     double testSP = SmartDashboard.getNumber("Set Point test", 100);
 
     if (driverJoystick.getCrossButton()) {
