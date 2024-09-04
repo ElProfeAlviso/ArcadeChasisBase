@@ -1,99 +1,108 @@
-//Paquete principal del robot y el proyecto JAVA
+
+//Paquete principal del robot y el proyecto JAVA Main.
 package frc.robot;
 
-//Clases que se van a utilizar en el proyecto.
-import edu.wpi.first.wpilibj.TimedRobot;  //Clase de framework de un robot timed, las funciones periodicas se ejecutan cada 20ms.
-import edu.wpi.first.wpilibj.Timer;       //Clase de un temporizador para calcular tiempo.
-import edu.wpi.first.wpilibj.PS4Controller;//Clase para interface de un control PS4
-import edu.wpi.first.wpilibj.PneumaticsModuleType;
-import edu.wpi.first.wpilibj.drive.DifferentialDrive; //Clase para manejo de un robot con drive diferencial 
+//Librerias de Robot,framework de un robot timed, las funciones periodicas se ejecutan cada 20ms.
+import edu.wpi.first.wpilibj.TimedRobot; //Framework de un robot basado en iteracion de tiempo.
+import edu.wpi.first.wpilibj.Timer; //Clase de un temporizador para generar tiempo.
+import edu.wpi.first.wpilibj.drive.DifferentialDrive; //Clase para manejo de un robot con drive diferencial tipo Arcade
+
+//Librerias de Motores
 import edu.wpi.first.wpilibj.motorcontrol.VictorSP; //Clase para controladores de velocidad VictorSP
-import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
-import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
-import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard; //Clase para lectura/escritura en Shuffleboard.
-import frc.robot.LimelightHelpers;
+import edu.wpi.first.wpilibj.Servo;//Clase para control de un servomotor PWM
 
-import java.util.Map;
+//Librerias de Pneumatica
+import edu.wpi.first.wpilibj.PneumaticHub; //Clase para controlar el modulo neumatico de REV
+import edu.wpi.first.wpilibj.Compressor; //Clase para activar el compresor
+import edu.wpi.first.wpilibj.Solenoid; //Clase para crear objetos de solenoide simple.
 
-import edu.wpi.first.cameraserver.CameraServer; //Clase para iniciar la transmision USB de webcam
-import edu.wpi.first.cscore.UsbCamera; //Clase para crear objeto de camara USB y configurar sus parametros de video.
-import edu.wpi.first.networktables.GenericEntry;
-import edu.wpi.first.wpilibj.CounterBase; //Clase para conteo de ticks de encoders.
-import edu.wpi.first.wpilibj.DigitalInput;
-import edu.wpi.first.wpilibj.Encoder; //Clase para interface con sensores encoders.
-import edu.wpi.first.wpilibj.AnalogInput;
-import edu.wpi.first.wpilibj.Compressor;
+//Librerias de Sensores y IO
+import edu.wpi.first.wpilibj.PS4Controller; //Clase para recibir control de un Joystick PS4
+import edu.wpi.first.wpilibj.AnalogInput; //Clase para leer entradas en los puertos analogicos
+import edu.wpi.first.wpilibj.DigitalInput;//Clase para leer señales en los puertos de entradas digitales
+import edu.wpi.first.wpilibj.CounterBase; //Clase para contar los ticks en una entrada digital.
+import edu.wpi.first.wpilibj.Encoder;//Clase para leer encoders de tipo cuadratura 4 señales en 2 canales A y B
+import com.kauailabs.navx.frc.AHRS;//clase para un sensor de navegacion de tipo Attitude and Heading Reference System LA NAVX
+import edu.wpi.first.wpilibj.SPI;//Clase para comunicar con el puerto SPI del Roborio.
 
-import com.kauailabs.navx.frc.AHRS;
-import edu.wpi.first.wpilibj.SPI;
-import edu.wpi.first.wpilibj.Servo;
-import edu.wpi.first.wpilibj.Solenoid;
-import edu.wpi.first.networktables.NetworkTable;
-import edu.wpi.first.networktables.NetworkTableEntry;
-import edu.wpi.first.networktables.NetworkTableInstance;
-import edu.wpi.first.wpilibj.PneumaticHub;
+//Librerias de Vision y Limelight
+import edu.wpi.first.cameraserver.CameraServer;//Clase para crear el stream de una camara USB conectada al roborio.
+import edu.wpi.first.cscore.UsbCamera;//Clase para crear una instancia de una camara USB
+import edu.wpi.first.networktables.NetworkTable;//Clase para el Systema de envio de mensajes por red 
+import edu.wpi.first.networktables.NetworkTableEntry;//Clase para crear entradas en el Systema de envio de mensajes por red 
+import edu.wpi.first.networktables.NetworkTableInstance;//Clase para crear instancias de network tables
+import edu.wpi.first.networktables.GenericEntry;//Clase para crear entradas genericas en network tables.
+
+//Librerias de SmartDashboard y Shuffleboard.
+import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;//Clase para programar con codigo los widgets del shuffleboard.
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;//Clase para enviar datos al shuffleboard en lugar de smartdashboard
+import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;//Clase para seleccionar una pestaña en el shuffleboard
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;//Clase para crear un objeto de seleccion de autonomos
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard; //Clase para lectura/escritura en Shuffleboard de forma directa.
+
+//Librerias de utilidades de JAVA
+import java.util.Map;//clase para establecer un minimo y un maximo en un widget custom.
 
 
-
+//Clase Principal de robot con framework timedrobot.
 public class Robot extends TimedRobot {
 
-  Servo servo = new Servo(9);
+  //Declaracion de constantes
+  double setpoint;
+  double anguloZ = 0;
+  double ServoPosition = 0.5;
+  double chasisSpeed = 0;
+  double testSP = 0;
+
   
-   private static final String kDefaultAuto = "Default";
+  //Creacion de instancias de Sensores
+  AnalogInput distancia = new AnalogInput(1);
+  private final AHRS navx = new AHRS(SPI.Port.kMXP);
+  DigitalInput LimitSwitch = new DigitalInput(4);
+  DigitalInput HallSwitch = new DigitalInput(5);
+  DigitalInput ProxSwitch = new DigitalInput(6);
+  // Se crean los encoders izquierdo y derecho y su mapeo de conexion.
+  private final Encoder leftEncoder = new Encoder(0, 1, true, CounterBase.EncodingType.k4X);
+  private final Encoder rightEncoder = new Encoder(2, 3, false, CounterBase.EncodingType.k4X);
+
+  //Creacion de instancias de motores 
+  private final Servo servo = new Servo(9);
+  // Se crean los objetos de motores iquierdos y derechos.
+  private final VictorSP leftMotors = new VictorSP(0);
+  private final VictorSP rightMotors = new VictorSP(1);
+  // Se crea el objeto de un drive diferencial y se le agregan los motores izquierdos y derechos
+  private final DifferentialDrive robotDrive = new DifferentialDrive(leftMotors, rightMotors);
+
+  // Se agrega el controlador del PS4
+  private final PS4Controller driverJoystick = new PS4Controller(0);
+  // Se crea un timer
+  private final Timer timer = new Timer();
+
+  //Constantes de nombres de autonomos
+  private static final String kDefaultAuto = "Default";
   private static final String kCustomAuto = "My Auto";
   private String m_autoSelected;
   private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
-  //Clase principal del  principal del robot aqui se ponen variables globales.
-
-
-
-  private final AHRS navx = new AHRS(SPI.Port.kMXP);
-  //Se crean los objetos de motores iquierdos y derechos.
-  private final VictorSP leftMotors = new VictorSP(0);
-  private final VictorSP rightMotors = new VictorSP(1);
-
-  //Se crea el objeto de un drive diferencial y se le agregan los motores izquierdos y derechos
-  private final DifferentialDrive robotDrive = new DifferentialDrive(leftMotors, rightMotors);
-  //Se agrega el controlador del PS4
-  private final PS4Controller driverJoystick = new PS4Controller(0);
-  //Se crea un timer
-  private final Timer timer = new Timer();
-  //Se crean los encoders izquierdo y derecho y su mapeo de conexion.
-  private final Encoder leftEncoder = new Encoder(0, 1, true, CounterBase.EncodingType.k4X);
-  private final Encoder rightEncoder = new Encoder(2, 3, false, CounterBase.EncodingType.k4X);
-  DigitalInput LimitSwitch = new DigitalInput(4);
-  DigitalInput HallSwitch = new DigitalInput(5);
-  DigitalInput ProxSwitch = new DigitalInput(6);
-
-  AnalogInput distancia = new AnalogInput(1);
-  
-
+  //Se crean instancias de objetos del Shuffleboard
   ShuffleboardTab tab = Shuffleboard.getTab("ShuffleBoard");
-  //GenericEntry ShuffleBoard = tab.add("Distancia", 0).getEntry();
-  //GenericEntry motores = tab.addPersistent("Max Speed", 1).withWidget(BuiltInWidgets.kNumberSlider).withProperties(Map.of("min",0,"max",1)).withSize(4, 2).withPosition(0, 5).getEntry();
+  GenericEntry ShuffleBoard = tab.add("Distancia", 0).getEntry();
+  GenericEntry motores = tab.addPersistent("Max Speed", 1).withWidget(BuiltInWidgets.kNumberSlider).withProperties(Map.of("min",0,"max",1)).withSize(4, 2).withPosition(0, 5).getEntry();
 
-  double setpoint;
-  double anguloZ = 0;
-
-
+  //Creacion de Instancia de networktable de limelight.
   NetworkTable table = NetworkTableInstance.getDefault().getTable("limelight");
   NetworkTableEntry tx = table.getEntry("tx");
   NetworkTableEntry ty = table.getEntry("ty");
   NetworkTableEntry ta = table.getEntry("ta");
 
+  //Creacion de instancias de objetos neumaticos.
   PneumaticHub m_pH = new PneumaticHub(1);
   private final Solenoid m_solenoid = m_pH.makeSolenoid(0);
   private final Compressor m_compressor = m_pH.makeCompressor();
 
-  //Constructor de la clase robot.
-  public Robot() {
 
-    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
-    m_chooser.addOption("My Auto", kCustomAuto);
-    SmartDashboard.putData("Auto choices", m_chooser);
+
+  public Robot() {    
     
   }
 
@@ -103,14 +112,25 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotInit() {
+
+
+    //Menu para seleccionar Autonomo
+    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
+    m_chooser.addOption("My Auto", kCustomAuto);
+    SmartDashboard.putData("Auto choices", m_chooser);
+
+    //Activar modo Test en Driver station y shuffleboard.
+    enableLiveWindowInTest(true);
+
+    //Inicializar Sensor de distancia
     distancia.setOversampleBits(4);
     distancia.setAverageBits(4);
 
-    robotDrive.setDeadband(0.05);//Evita que se mueva el robot con movimientos muy minimos del joystick
-
-    rightMotors.setInverted(true);//invierte el giro del  motor derecho segun la posicion en el chasis.
+    //inicializar motores
+    rightMotors.setInverted(true);// invierte el giro del motor derecho segun la posicion en el chasis.
+    //inicializar Drive
     robotDrive.setMaxOutput(0.8); //Limita la velocidad maxima del Drive Train a 0.8 para pruebas.
-
+    robotDrive.setDeadband(0.05);// Evita que se mueva el robot con movimientos muy minimos del joystick
     //Inicializar encoders
     leftEncoder.setSamplesToAverage(5); //El numero promedio de muestras antes de hacer el calculo.
     leftEncoder.setDistancePerPulse(1.0 / 360.0 * Math.PI * 6);//Ajusta la distancia recorrida por cada pulso de conteo.
@@ -122,43 +142,39 @@ public class Robot extends TimedRobot {
     rightEncoder.setMinRate(1.0);//Es el movimiento minimo para indicar que el motor esta en movimiento.
     rightEncoder.reset();//Vuelve la cuenta del encoder a cero.
 
-    //Inicializar datos en Dashboard
+    //Inicializar datos en Dashboard para que inicien con valor inicial.
     SmartDashboard.putNumber("Chasis Speed", 0.5);
     SmartDashboard.putNumber("AutoCM", 0);
     SmartDashboard.putNumber("Set Point test", 100);
     SmartDashboard.putNumber("Motores/servo", 0.5);
 
-   
-
-      //Inicia la captura automática de la cámara USB
-        UsbCamera camera = CameraServer.startAutomaticCapture("Camara Frontal", 0);
-        // Establece la resolución y la velocidad de cuadros
-        camera.setResolution(320, 240);
-        camera.setFPS(15);
-        // Configuración adicional si es necesaria
-        camera.setBrightness(50); // Ajustar el brillo
-        camera.setExposureManual(50); // Ajustar la exposición
-        
-        anguloZ = 0;
-        
-        navx.reset();
+    //Inicializacion de camara usb y stream automatico.
+    UsbCamera camera = CameraServer.startAutomaticCapture("Camara Frontal", 0);
+    camera.setResolution(320, 240);
+    camera.setFPS(15);
+    camera.setBrightness(50); // Ajustar el brillo
+    camera.setExposureManual(50); // Ajustar la exposición
+    
+    //inicalizacion de Gyroscopio.
+    navx.reset();
   }
   
   @Override
   public void robotPeriodic() {
 
-    if (driverJoystick.getOptionsButton()) {
-      
-      navx.reset();
-      navx.resetDisplacement();
+    
 
-    }
+    //Lectura y acondicionamiento de señal de sensor de distancia.
+    double sensorValue = distancia.getVoltage();
+    final double scaleFactor = 1; // scale converting voltage to distance CM
+    double distance = 5 * sensorValue * scaleFactor; // convert the voltage to distance
+    SmartDashboard.putNumber("Sensores/Ultrasonic MB1200", distance); // write the value to the LabVIEW DriverStation
 
-   
+    //Envio de datos de sensores digitales al SmartDashboard.
     SmartDashboard.putBoolean("Sensores/Limit Switch", !LimitSwitch.get());
     SmartDashboard.putBoolean("Sensores/Hall Switch", !HallSwitch.get());
     SmartDashboard.putBoolean("Sensores/Prox Switch", ProxSwitch.get());
-
+    //envio de datos de encoders al smartDashboard.
     SmartDashboard.putNumber("Sensores/LeftEncoder Distance inches", Math.round(leftEncoder.getDistance() * 100) / 100d);
     SmartDashboard.putNumber("Sensores/LeftEncoder Distance CM", Math.round(2.54 * leftEncoder.getDistance() * 100) / 100d);
     SmartDashboard.putNumber("Sensores/LeftEncoder Rate", leftEncoder.getRate());
@@ -167,17 +183,6 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Sensores/RightEncoder Distance CM", Math.round(2.54 * rightEncoder.getDistance() * 100) / 100d);
     SmartDashboard.putNumber("Sensores/RightEncoder Rate", rightEncoder.getRate());
     SmartDashboard.putNumber("Sensores/RightEncoder raw", rightEncoder.getRaw());
-
-
-    double sensorValue = distancia.getVoltage();
-    final double scaleFactor = 1; // scale converting voltage to distance CM
-    double distance = 5 * sensorValue * scaleFactor; // convert the voltage to distance
-    SmartDashboard.putNumber("Sensores/Ultrasonic MB1200", distance); // write the value to the LabVIEW DriverStation
-
-    //ShuffleBoard.setDouble(distance);
-    //motores.getDouble(1);
-
-
 
     // Leer los datos del NavX y mostrarlos en el SmartDashboard
     double yaw = navx.getYaw(); // Ángulo de rotación alrededor del eje Z
@@ -223,7 +228,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Navx/Temperature", temperature);
     SmartDashboard.putNumber("Navx/Angulo", anguloZ);
 
-
+    //Leer y mostrar los datos de la Limelight
     double x = tx.getDouble(0.0);
     double y = ty.getDouble(0.0);
     double area = ta.getDouble(0.0);
@@ -232,9 +237,20 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Vision/LimelightY", y);
     SmartDashboard.putNumber("Vision/LimelightArea", area);
 
+    //Muestra los datos del sistema neumatico
+    SmartDashboard.putBoolean("Sensores/Compresor", m_compressor.isEnabled());
+    
     
 
-    servo.set(SmartDashboard.getNumber("Motores/servo", 0.5));
+    //Lectura de datos desde el smartdashboard.
+    ServoPosition = SmartDashboard.getNumber("Motores/servo", 0.5);
+    chasisSpeed = SmartDashboard.getNumber("Chasis Speed", 0.5);
+    testSP = SmartDashboard.getNumber("Set Point test", 100);
+
+    
+   
+
+    
 
   }
 
@@ -258,40 +274,32 @@ public class Robot extends TimedRobot {
 
     switch (m_autoSelected) {
       case kCustomAuto:
-        // Put custom auto code here
+        double leftDistance = Math.round(2.54 * leftEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder en CM                                   
+        double rightDistance = Math.round(2.54 * rightEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder en CM                                                                                          // encoder en CM
+        double chasisDistance = ((leftDistance + rightDistance) / 2); // obtiene un promedio de las 2 distancias.
+        // Control de avance en autonomo con encoders.
+        int autoSPcm = 100;
+        if (chasisDistance < autoSPcm) {
+          robotDrive.arcadeDrive(0.5, 0);
+
+        } else {
+
+          robotDrive.arcadeDrive(0, 0);
+
+        }
         break;
       case kDefaultAuto:
       default:
-        // Put default auto code here
+        // Control de autonomo por tiempo de 2 seconds
+        if (timer.get() < 2.0) {
+          // Drive forwards half speed, make sure to turn input squaring off
+          robotDrive.arcadeDrive(0.5, 0.0, false);
+        } else {
+          robotDrive.stopMotor(); // stop robot
+        }
         break;
     }
-
-    double leftDistance = Math.round(2.54 * leftEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder en CM
-    double rightDistance = Math.round(2.54 * rightEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder en CM
-    double chasisDistance = ((leftDistance + rightDistance) / 2); // obtiene un promedio de las 2 distancias.
-   
-    //Control de avance en autonomo con encoders.
-
     
-    int autoSPcm = 100;
-    if (chasisDistance < autoSPcm) {
-      robotDrive.arcadeDrive(0.5, 0);
-      
-    } else {
-    
-      robotDrive.arcadeDrive(0,0);
-    
-    }
-    
-    
-    // Control de autonomo por tiempo de  2 seconds
-    /*if (timer.get() < 2.0) {
-      // Drive forwards half speed, make sure to turn input squaring off
-      robotDrive.arcadeDrive(0.5, 0.0, false);
-    } else {
-      robotDrive.stopMotor(); // stop robot
-    }
-    */
   }
 
   /** This function is called once each time the robot enters teleoperated mode. */
@@ -306,14 +314,17 @@ public class Robot extends TimedRobot {
   /** This function is called periodically during teleoperated mode. */
   @Override
   public void teleopPeriodic() {
+    // reset manual en teleop del gyroscopio.
+    if (driverJoystick.getOptionsButton()) {
+      navx.reset();
+      navx.resetDisplacement();
+    }
 
-      
-
-        double chasisSpeed = SmartDashboard.getNumber("Chasis Speed", 0.5);
-
+    
+    servo.set(ServoPosition);
+ 
     double power = -driverJoystick.getLeftY();
     double turn = -driverJoystick.getRightX();
-
     robotDrive.arcadeDrive( power * chasisSpeed, turn * chasisSpeed);
 
     
@@ -331,17 +342,15 @@ public class Robot extends TimedRobot {
     rightEncoder.reset();
     timer.restart();
     setpoint = 0;
-
-
   }
 
   /** This function is called periodically during test mode. */
   @Override
   public void testPeriodic() {
 
-
-      m_solenoid.set(true);
-    double testSP = SmartDashboard.getNumber("Set Point test", 100);
+    m_solenoid.set(true);
+    
+    
 
     if (driverJoystick.getCrossButton()) {
 
@@ -351,12 +360,13 @@ public class Robot extends TimedRobot {
       setpoint = 0;
 
     }
-
-    double leftDistance = Math.round(2.54 * leftEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder en CM
-    double rightDistance = Math.round(2.54 * rightEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder en CM
+    double leftDistance = Math.round(2.54 * leftEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder                                                                             
+    double rightDistance = Math.round(2.54 * rightEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder
+                                                                                      
+    
     double chasisDistance = ((leftDistance + rightDistance) / 2); // obtiene un promedio de las 2 distancias.
 
-    double error = setpoint - rightDistance;
+    double error = setpoint - chasisDistance;
     double kP = 0.05;
     double outputSpeed = kP * error;
     double ScaledOutputSpeed = Math.max(-1.0, Math.min(1.0, outputSpeed));
@@ -369,19 +379,15 @@ public class Robot extends TimedRobot {
     //robotDrive.arcadeDrive(outputSpeed, 0);
 
     // Muestra los valores en autonomo.
-
     SmartDashboard.putNumber("PIDChasis/Set Point", setpoint);
     SmartDashboard.putNumber("PIDChasis/Right Position", rightDistance);
     SmartDashboard.putNumber("PIDChasis/Left Position", leftDistance);
-    SmartDashboard.putNumber("PIDChasis/outputSpeed %", ScaledOutputSpeed*100);
-
-
-
+    SmartDashboard.putNumber("PIDChasis/outputSpeed %", ScaledOutputSpeed * 100);
+    
   }
   
 
-  //Dashboard Outs
-
+  
   
 
 
