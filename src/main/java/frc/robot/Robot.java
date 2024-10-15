@@ -28,6 +28,7 @@ import edu.wpi.first.wpilibj.SPI;//Clase para comunicar con el puerto SPI del Ro
 //Librerias de Vision y Limelight
 import edu.wpi.first.cameraserver.CameraServer;//Clase para crear el stream de una camara USB conectada al roborio.
 import edu.wpi.first.cscore.UsbCamera;//Clase para crear una instancia de una camara USB
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.networktables.NetworkTable;//Clase para el Systema de envio de mensajes por red 
 import edu.wpi.first.networktables.NetworkTableEntry;//Clase para crear entradas en el Systema de envio de mensajes por red 
 import edu.wpi.first.networktables.NetworkTableInstance;//Clase para crear instancias de network tables
@@ -39,6 +40,7 @@ import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;//Clase para enviar datos
 import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;//Clase para seleccionar una pestaña en el shuffleboard
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;//Clase para crear un objeto de seleccion de autonomos
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard; //Clase para lectura/escritura en Shuffleboard de forma directa.
+import edu.wpi.first.wpilibj2.command.PIDCommand;
 
 //Librerias de utilidades de JAVA
 import java.util.Map;//clase para establecer un minimo y un maximo en un widget custom.
@@ -53,7 +55,7 @@ public class Robot extends TimedRobot {
   double ServoPosition = 0.5;
   double chasisSpeed = 0;
   double testSP = 0;
-
+  double distanciaLimelight = 0;
   
   //Creacion de instancias de Sensores
   AnalogInput distancia = new AnalogInput(1);
@@ -94,12 +96,14 @@ public class Robot extends TimedRobot {
   NetworkTableEntry tx = table.getEntry("tx");
   NetworkTableEntry ty = table.getEntry("ty");
   NetworkTableEntry ta = table.getEntry("ta");
-
+  NetworkTableEntry tv = table.getEntry("tv");
+  double presencia = tv.getDouble(0.0);
+  double forwardSpeed = 0;
+   double area = ta.getDouble(0.0);
   //Creacion de instancias de objetos neumaticos.
   PneumaticHub m_pH = new PneumaticHub(1);
   private final Solenoid m_solenoid = m_pH.makeSolenoid(0);
   private final Compressor m_compressor = m_pH.makeCompressor();
-
 
 
   public Robot() {    
@@ -147,7 +151,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("AutoCM", 0);
     SmartDashboard.putNumber("Set Point test", 100);
     SmartDashboard.putNumber("Motores/servo", 0.5);
-
+ 
     //Inicializacion de camara usb y stream automatico.
     UsbCamera camera = CameraServer.startAutomaticCapture("Camara Frontal", 0);
     camera.setResolution(320, 240);
@@ -232,7 +236,7 @@ public class Robot extends TimedRobot {
     double x = tx.getDouble(0.0);
     double y = ty.getDouble(0.0);
     double area = ta.getDouble(0.0);
-
+    
     SmartDashboard.putNumber("Vision/LimelightX", x);
     SmartDashboard.putNumber("Vision/LimelightY", y);
     SmartDashboard.putNumber("Vision/LimelightArea", area);
@@ -246,7 +250,7 @@ public class Robot extends TimedRobot {
     ServoPosition = SmartDashboard.getNumber("Motores/servo", 0.5);
     chasisSpeed = SmartDashboard.getNumber("Chasis Speed", 0.5);
     testSP = SmartDashboard.getNumber("Set Point test", 100);
-
+    distanciaLimelight = SmartDashboard.getNumber("Distancia presencia", 100);
     
    
 
@@ -320,21 +324,33 @@ public class Robot extends TimedRobot {
       navx.resetDisplacement();
     }
 
+    setpoint = 8;
+     Double leftDistance = Math.round(2.54 * leftEncoder.getDistance() * 100) / 100d;// Escala la distancia del encoder                                                                             
+    double rightDistance = Math.round(2.54 * rightEncoder.getDistance() * 100) / 100d;
     
-    servo.set(ServoPosition);
- 
-    double power = -driverJoystick.getLeftY();
-    double turn = -driverJoystick.getRightX();
-    robotDrive.arcadeDrive( power * chasisSpeed, turn * chasisSpeed);
+    double chasisDistance = ((leftDistance + rightDistance) / 2);
+     double error = setpoint - chasisDistance;
+    double kP = 0.05;
+    double outputSpeed = kP * error;
+    double ScaledOutputSpeed = Math.max(-1.0, Math.min(1.0, outputSpeed));
+PIDController lime = new PIDController(anguloZ, ServoPosition, kDefaultPeriod);
 
-    
+if(area<=8 && presencia == 1){
+robotDrive.arcadeDrive(0.5, kDefaultPeriod);
 
-    
 
-    
-    
-  }
+}
+else{if(area>8 && presencia == 1){
+robotDrive.arcadeDrive(-0.5, kDefaultPeriod);
+}
+else{
+robotDrive.arcadeDrive(0, kDefaultPeriod);
 
+}
+}
+}
+    
+  
   /** This function is called once each time the robot enters test mode. */
   @Override
   public void testInit() {
