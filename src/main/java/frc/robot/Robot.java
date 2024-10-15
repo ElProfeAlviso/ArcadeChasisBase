@@ -125,14 +125,17 @@ public class Robot extends TimedRobot {
 	NetworkTableEntry tx = table.getEntry("tx");
 	NetworkTableEntry ty = table.getEntry("ty");
 	NetworkTableEntry ta = table.getEntry("ta");
+	
 
 	// Creacion de instancias de objetos neumaticos.
 	PneumaticHub m_pH = new PneumaticHub(1);
 	private final Solenoid m_solenoid = m_pH.makeSolenoid(0);
 	private final Compressor m_compressor = m_pH.makeCompressor();
 
+	//PID's
 	private final PIDController chasisPIDleft = new PIDController(0.025, 0.046, 0.0016);
 	private final PIDController chasisPIDright = new PIDController(0.025, 0.046, 0.0016);
+	private final PIDController PIDlimelight = new PIDController(0.025, 0.046, 0.0016);
 
 	// Motores Neos
 
@@ -205,6 +208,7 @@ public class Robot extends TimedRobot {
 		NetworkTableEntry tx = table.getEntry("tx");
 		NetworkTableEntry ty = table.getEntry("ty");
 		NetworkTableEntry ta = table.getEntry("ta");
+		NetworkTableEntry target = table.getEntry("tv");
 
 		
 	}
@@ -490,7 +494,7 @@ public class Robot extends TimedRobot {
 		//
 		//
 		if(m_limelight.hasTarget()){
-			double tx = m_limelight.getTx
+			double 
 		}
 
 		// robotDrive.arcadeDrive(outputSpeed, 0);
