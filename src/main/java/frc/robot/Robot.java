@@ -105,6 +105,9 @@ public class Robot extends TimedRobot {
   private final Solenoid m_solenoid = m_pH.makeSolenoid(0);
   private final Compressor m_compressor = m_pH.makeCompressor();
 
+  PIDController PIDForwardLimelight = new PIDController(0.06, 0.02,0.002);
+   PIDController PIDturnLimelight = new PIDController(0.06, 0.02,0.002);
+
 
   public Robot() {    
     
@@ -318,7 +321,37 @@ public class Robot extends TimedRobot {
   /** This function is called periodically during teleoperated mode. */
   @Override
   public void teleopPeriodic() {
-    // reset manual en teleop del gyroscopio.
+
+    double x = tx.getDouble(0.0);
+    double y = ty.getDouble(0.0);
+    double area = ta.getDouble(0.0);
+
+    double presencia = tv.getDouble(0.0);
+  double forwardSpeed = 0;
+
+  if (presencia == 1){
+
+    double LimelightForward = PIDForwardLimelight.calculate(area,2);
+    double Limelightturn = PIDturnLimelight.calculate(x,0);
+
+    robotDrive.arcadeDrive(LimelightForward,Limelightturn);
+
+  }
+
+    else {
+
+      robotDrive.arcadeDrive(0, 0);
+    }
+
+    
+    
+
+
+
+  }
+   
+
+    /* reset manual en teleop del gyroscopio.
     if (driverJoystick.getOptionsButton()) {
       navx.reset();
       navx.resetDisplacement();
@@ -335,20 +368,20 @@ public class Robot extends TimedRobot {
     double ScaledOutputSpeed = Math.max(-1.0, Math.min(1.0, outputSpeed));
 PIDController lime = new PIDController(anguloZ, ServoPosition, kDefaultPeriod);
 
-if(area<=8 && presencia == 1){
-robotDrive.arcadeDrive(0.5, kDefaultPeriod);
+if(area <= 2 && presencia == 1){
+robotDrive.arcadeDrive(0.5, 0);
 
 
 }
-else{if(area>8 && presencia == 1){
-robotDrive.arcadeDrive(-0.5, kDefaultPeriod);
+else{if(area>2 && presencia == 1){
+robotDrive.arcadeDrive(-0.5, 0);
 }
 else{
-robotDrive.arcadeDrive(0, kDefaultPeriod);
+robotDrive.arcadeDrive(0, 0);
 
 }
-}
-}
+}*/
+
     
   
   /** This function is called once each time the robot enters test mode. */
